@@ -125,3 +125,148 @@ class MACHINE():
             return False    
 
     
+    def check_get2point(self):
+            candidate = []
+            count = 0
+            for (point1, point2) in list(combinations(self.whole_points, 2)):
+                if self.check_availability([point1, point2]): # 이 선이 그릴 수 있는 선인지?
+                    newLine = self.organize_points([point1, point2])
+                    if self.check_triangleCount(newLine) == 2:
+                        candidate.append(newLine)
+                        print("get2point : " + str(newLine))
+            if candidate:
+                return random.choice(candidate)
+
+        
+            
+        
+    def check_get1point(self):
+        # 상대방이 방금 그은 선분만 확인 -> 이 선분이 아닌 다른 선분들은 확인할 필요가 없지 않을까? -> 아니었음
+        # 그 선분으로 점수가 나는 상황 -> 내가 낚시에 걸리는 상황인지 확인, 아니라면 점수 획득
+
+        candidate = []
+        
+        # 모든 선분에 대해 점수 낼 수 있는 선분이 있는지 판단
+        for previousLine in self.drawn_lines:
+
+            # 한 선분의 양 끝 점에 연결된 다른 선분들 찾기
+            point1 = previousLine[0]
+            point2 = previousLine[1]
+            point1_connected = [] 
+            point2_connected = []
+            for l in self.drawn_lines:
+                if l==previousLine: # 자기 자신 제외
+                    continue
+                if point1 in l:
+                    point1_connected.append(l)
+                if point2 in l:
+                    point2_connected.append(l)
+
+            # 두 점 각각에 대해 연결된 선분과 함께 만들어지는 점수가 있는지 판단
+            if point1_connected:
+                for l in point1_connected:
+                    p = l[0] if l[0] != point1 else l[1]
+                    thirdLine = self.organize_points([p,point2]) # 
+                    if self.check_availability(thirdLine):
+                        triangle = self.organize_points(list(set(chain(*[previousLine, l, thirdLine]))))
+                        if len(triangle) != 3 or triangle in self.triangles: # 삼각형이 아니거나 이미 있는 삼각형인 경우는 패스
+                            continue
+
+                        empty = True
+                        for point in self.whole_points: # 만들어진 삼각형 내부에 점이 있는지 판단
+                            if point in triangle:
+                                continue
+                            if bool(Polygon(triangle).intersection(Point(point))):
+                                empty = False
+                        if empty:
+                            # 낚시 상황인지 판단하고 아닐경우에, candidate에 없는 원소이면 추가
+                            if thirdLine not in candidate:
+                                candidate.append(thirdLine)
+            # 두번째 점
+            if point2_connected:
+                for l in point2_connected:
+                    p = l[0] if l[0] != point2 else l[1]
+                    thirdLine = self.organize_points([p,point1])
+                    if self.check_availability(thirdLine):
+                        triangle = self.organize_points(list(set(chain(*[previousLine, l, thirdLine]))))
+                        if len(triangle) != 3 or triangle in self.triangles: # 삼각형이 아니거나 이미 있는 삼각형인 경우는 패스
+                            continue
+
+                        empty = True
+                        for point in self.whole_points: # 만들어진 삼각형 내부에 점이 있는지 판단
+                            if point in triangle:
+                                continue
+                            if bool(Polygon(triangle).intersection(Point(point))):
+                                empty = False
+                        if empty:
+                            # 낚시 상황인지 판단하고 아닐경우에, candidate에 없는 원소이면 추가
+                            if thirdLine not in candidate:
+                                print("get1point : "+ str(thirdLine))
+                                candidate.append(thirdLine)
+        
+        if candidate:
+            return candidate[0]
+
+
+
+    def countNoScoreActions(self):
+        candidate = []
+        count = 0
+        for (point1, point2) in list(combinations(self.whole_points, 2)):
+            if self.check_availability([point1, point2]): # 이 선이 그릴 수 있는 선인지?
+                newLine = self.organize_points([point1, point2])
+                self.drawn_lines.append(newLine) # 그릴 수 있는 선이라면 그렸다고 가정하고 리스트에 추가
+                if self.check_get1point() == None: # 그린 상황에서 점수가 발생하는지 확인
+                    candidate.append(newLine)
+                    count += 1
+                    print(point1, point2)
+                self.drawn_lines.remove(newLine) # 넣었던 선 다시 삭제
+        print("NoScoreAction : " + str(count))
+        if candidate:
+            return random.choice(candidate)
+
+        
+
+
+    def check_triangleCount(self, line):
+        get_score_count = 0
+
+        point1 = line[0]
+        point2 = line[1]
+
+        point1_connected = [] # 방금 그은 선의 두 점에 이미 그어진 line을 담는 배열
+        point2_connected = []
+
+        for l in self.drawn_lines:
+            if l==line: # 자기 자신 제외
+                continue
+            if point1 in l:
+                point1_connected.append(l)
+            if point2 in l:
+                point2_connected.append(l)
+
+        if point1_connected and point2_connected: # 최소한 2점 모두 다른 선분과 연결되어 있어야 함
+            for line1, line2 in product(point1_connected, point2_connected):
+                
+                # Check if it is a triangle & Skip the triangle has occupied
+                triangle = self.organize_points(list(set(chain(*[line, line1, line2]))))
+                if len(triangle) != 3 or triangle in self.triangles: # 삼각형이 아니거나 이미 있는 삼각형인 경우는 패스
+                    continue
+                
+                get_score = True
+                for point in self.whole_points: # 만들어진 삼각형 내부에 점이 있는지 판단
+                    if point in triangle:
+                        continue
+                    if bool(Polygon(triangle).intersection(Point(point))):
+                        get_score = False
+                if get_score:
+                    get_score_count += 1
+        
+        return get_score_count
+
+                
+
+                    
+    def organize_points(self, point_list):
+        point_list.sort(key=lambda x: (x[0], x[1]))
+        return point_list
