@@ -225,8 +225,6 @@ class MACHINE():
         if candidate:
             return random.choice(candidate)
 
-        
-
 
     def check_triangleCount(self, line):
         get_score_count = 0
@@ -264,6 +262,151 @@ class MACHINE():
         
         return get_score_count
 
+
+
+    def is_triangle(self, dots):
+        # Line: [(x1, y1), (x2, y2)]
+        # lines: [[(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)]]
+
+        if len(dots) == 3: # if is triangle
+            return True
+        else:
+            return False
+        
+    def return_dots_from_lines(self, lines):
+        return self.organize_points(list(set(chain(*[*lines]))))
+        
+    def is_occupied(self, dots):
+        # Line: [(x1, y1), (x2, y2)]
+        # lines: [[(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)]]
+        triangle = self.organize_points(list(dots))
+
+        if triangle in self.triangles: # if is triangle
+            return True
+        else:
+            return False
+
+    # return if line makes triangles (includes no-score triangle)
+    def return_triangles(self):
+        triangles = []
+        line_combinations = combinations(self.drawn_lines, 3)
+
+        # for all 3-line combinations (nC3)
+        for line_combination in line_combinations:
+
+            # all dots from all lines
+            dots = set(chain(*[line_combination[0], line_combination[1], line_combination[2]]))
+            
+            # if 3-line combination is triangle and not occupied
+            if self.is_triangle(dots) and not self.is_occupied(dots):
+                triangles.append(line_combination)
+
+        return triangles
+    
+
+    def is_fooling_triangle(self, triangle):
+        # Line: [(x1, y1), (x2, y2)]
+        # triangle: [Line, Line, Line]
+
+        # all dots from all lines
+        # dots = list(set(chain(*[triangle[0], triangle[1], triangle[2]])))
+
+        # 삼각형 내부에 있는 점 (선분 위는 삼각형 내부가 아니기 때문에, 선 위에 있는 점은 없음)
+        inside_dots = []
+
+        triangle_dots = list(set(chain(*[triangle[0], triangle[1], triangle[2]])))
+
+        for point in self.whole_points:
+
+            if point in triangle_dots:
+                continue
+
+            if bool(Polygon(triangle_dots).intersection(Point(point))): 
+                # 만들어진 삼각형 내부에 dot 이 있다면 (line 위에 있는 것도 True이기 때문에 line 위에 있는 점은 빼줘야 함)
+               
+                for line in triangle:
+                    if bool(LineString(self.organize_points(line)).intersection(Point(point))):
+                        return False, []
+                else:
+                    inside_dots.append(point)
+
+        if len(inside_dots) == 0:
+            return False, inside_dots, []
+        
+        elif len(inside_dots) > 1:
+            return False, inside_dots, []
+        
+        else:
+            inside_lines = []
+            for vertex in triangle_dots:
+                temp_line = self.organize_points([vertex, inside_dots[0]])
+                if temp_line in self.drawn_lines:
+                    inside_lines.append(temp_line)
+
+
+            return True, inside_dots, inside_lines
+
+
+    # Score Checking Functions
+    def return_fooling_triangles(self):
+        # Line: [(x1, y1), (x2, y2)]
+        # triangle: [Line, Line, Line]
+        # triangles: [triangle, triangle, ...]
+
+        result = {
+            "candidate_fooling_triangles" : [], # 중심에서 꼭짓점으로 선을 그음으로써 낚시 삼각형으로 만들 수 있는 후보 낚시 삼각형들의 dots, lines -> List[List[List[Point, ...], List[Line, ...]], ...]
+            "fooling_triangles" : [], # 낚시 삼각형들의 dots, lines -> List[List[List[Point, ...], List[Line, ...]], ...]
+            "fooled_triangles" : [] # 상대방이 낚시 당한 낚시 삼각형들의 dots, lines -> List[List[List[Point, ...], List[Line, ...]], ...]
+                  }
+
+        triangles = self.return_triangles()
+
+        for triangle in triangles:
+
+            is_fooling_triangle, inside_dots, inside_lines = self.is_fooling_triangle(triangle)
+
+            if is_fooling_triangle:
+
+                if len(inside_lines) == 0:
+                    # 삼각형 내부에 점이 있지만, 0개의 선이 그어져 있으면 -> 상대방에게 낚시를 할 수 있는 상황인지 확인하는 용도
+                    candidate_fooling_triangle_dots = [*self.return_dots_from_lines(triangle), *inside_dots]
+                    candidate_fooling_triangle_lines = list(map(self.organize_points, [*triangle, *inside_lines]))
+                    candidate_fooling_triangle = [candidate_fooling_triangle_dots, candidate_fooling_triangle_lines]
+                    result["candidate_fooling_triangles"].append(candidate_fooling_triangle)
+
+                elif len(inside_lines) == 1:
+                    # 삼각형 내부에 점이 있고, 1개의 선이 그어져 있으면 -> 절대 건들면 안되는 낚시 삼각형
+                    fooling_triangle_dots = [*self.return_dots_from_lines(triangle), *inside_dots]
+                    fooling_triangle_lines =list(map(self.organize_points, [*triangle, *inside_lines]))
+                    fooling_triangle = [fooling_triangle_dots, fooling_triangle_lines]
+                    result["fooling_triangles"].append(fooling_triangle)
+
+                elif len(inside_lines) == 2:
+                    # 삼각형 내부에 점이 있지만, 2개의 선이 그어져 있으면 -> 상대방이 낚시에 걸렸는지 확인하는 용도
+                    fooled_triangle_dots = [*self.return_dots_from_lines(triangle), *inside_dots]
+                    fooled_triangle_lines = list(map(self.organize_points, [*triangle, *inside_lines]))
+                    fooled_triangle = [fooled_triangle_dots, fooled_triangle_lines]
+                    result["fooled_triangles"].append(fooled_triangle)
+
+        return result
+    
+    def is_opponent_fooled(self):
+        if self.drawn_lines:
+            recent_line = self.drawn_lines[-1]
+            result = self.return_fooling_triangles()
+
+            fooled_triangles = result["fooled_triangles"]
+
+            for fooled_triangle in fooled_triangles:
+                if recent_line in fooled_triangle[1]:
+                    return True
+            else:
+                return False
+        
+        else:
+            return False
+
+        
                 
 
                     
