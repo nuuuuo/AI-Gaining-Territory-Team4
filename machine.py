@@ -2,6 +2,8 @@ import random
 from itertools import combinations
 from shapely.geometry import LineString, Point
 
+from typing import List, Tuple
+
 class MACHINE():
     """
         [ MACHINE ]
@@ -264,47 +266,95 @@ class MACHINE():
 
 
 
-    def is_triangle(self, dots):
+    def is_triangle(self, lines: List[Tuple[int, int]]) -> bool:
+        """
+        Line: [(x1, y1), (x2, y2)]으로 이루어진 리스트를 받아서 삼각형인지 반환하는 함수입니다.
+
+        input : lines
+            lines: [[(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)]] 형식의 List[List[Tuple[int, int], ...]] 
+
+        output : is_triangle
+            is_triangle : True, False
+        """
         # Line: [(x1, y1), (x2, y2)]
         # lines: [[(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)]]
+
+        dots = self.return_dots_from_lines(lines)
 
         if len(dots) == 3: # if is triangle
             return True
         else:
             return False
         
-    def return_dots_from_lines(self, lines):
-        return self.organize_points(list(set(chain(*[*lines]))))
-        
-    def is_occupied(self, dots):
+    def is_occupied(self, lines: List[Tuple[int, int]]) -> bool:
+        """
+        Line: [(x1, y1), (x2, y2)]으로 이루어진 리스트를 받아서 이미 차지된 삼각형인지 반환하는 함수입니다.
+
+        input : lines
+            lines: [[(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)]] 형식의 List[List[Tuple[int, int], ...]] 
+        output : is_occupied
+            is_occupied : True, False
+        """
         # Line: [(x1, y1), (x2, y2)]
         # lines: [[(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)]]
-        triangle = self.organize_points(list(dots))
+
+        triangle = self.return_dots_from_lines(lines)
 
         if triangle in self.triangles: # if is triangle
             return True
         else:
             return False
+        
+    def return_dots_from_lines(self, lines: List[Tuple[int, int]]) -> List[Tuple[int]]:
+        """
+        Line: [(x1, y1), (x2, y2)]을 리스트를 받아서 포함된 모든 점의 집합을 반환하는 함수입니다.
+
+        input : lines
+            lines: [[(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)]] 형식의 List[Line, ...]
+
+        output : organized_dots
+            organized_dots: List[dot]
+        """
+        organized_dots = self.organize_points(list(set(chain(*[*lines]))))
+        return organized_dots
+        
+    
 
     # return if line makes triangles (includes no-score triangle)
-    def return_triangles(self):
+    def return_triangles(self) -> List[List[List[Tuple[int, int]]]]:
+        """
+        현재 map에 존재하는 모든 삼각형을 반환하는 함수입니다. 점수로 인정되지 않는 삼각형도 모두 반환합니다.
+        
+        input : -
+
+        output : triangles
+             triangles: List[List[Line, Line, Line], ...]
+        """
         triangles = []
         line_combinations = combinations(self.drawn_lines, 3)
 
         # for all 3-line combinations (nC3)
         for line_combination in line_combinations:
-
-            # all dots from all lines
-            dots = set(chain(*[line_combination[0], line_combination[1], line_combination[2]]))
             
             # if 3-line combination is triangle and not occupied
-            if self.is_triangle(dots) and not self.is_occupied(dots):
+            if self.is_triangle(line_combination) and not self.is_occupied(line_combination):
                 triangles.append(line_combination)
 
         return triangles
     
 
-    def is_fooling_triangle(self, triangle):
+    def is_fooling_triangle(self, triangle: List[Tuple[int, int]]):
+        """
+        삼각형을 입력받아 낚시 삼각형인지와, 해당 삼각형이 포함하는 선분, 점을 반환합니다.
+
+        input : triangle
+            triangle: [[(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)], [(x1, y1), (x2, y2)]] 형식의 List[Line, Line, Line]
+
+        output : [is_fooling_triangle, inside_dots, inside_lines]
+            is_fooling_triangle: 낚시 삼각형인지 아닌지 True, False 반환
+            inside_dots: 삼각형이 포함하는 모든 점 반환
+            inside_lines: 삼각형이 포함하는 모든 선분 반환
+        """
         # Line: [(x1, y1), (x2, y2)]
         # triangle: [Line, Line, Line]
 
@@ -348,7 +398,18 @@ class MACHINE():
 
 
     # Score Checking Functions
-    def return_fooling_triangles(self):
+    def return_fooling_triangles(self) -> dict:
+        """
+        현재 map에 낚시 삼각형 후보, 낚시 삼각형, 낚시 당한 삼각형을 모두 반환하는 함수입니다.
+
+        input : -
+
+        output : {
+            "candidate_fooling_triangles" : [], # 중심에서 꼭짓점으로 선을 그음으로써 낚시 삼각형으로 만들 수 있는 후보 낚시 삼각형들의 dots, lines -> List[List[List[Point, ...], List[Line, ...]], ...]
+            "fooling_triangles" : [], # 낚시 삼각형들의 dots, lines -> List[List[List[Point, ...], List[Line, ...]], ...]
+            "fooled_triangles" : [] # 상대방이 낚시 당한 낚시 삼각형들의 dots, lines -> List[List[List[Point, ...], List[Line, ...]], ...]
+                  }
+        """
         # Line: [(x1, y1), (x2, y2)]
         # triangle: [Line, Line, Line]
         # triangles: [triangle, triangle, ...]
@@ -391,6 +452,14 @@ class MACHINE():
         return result
     
     def is_opponent_fooled(self):
+        """
+        상대방이 낚시에 당했는지 확인하는 함수입니다.
+
+        input : -
+
+        output : is_opponent_fooled
+            is_opponent_fooled: True, False
+        """
         if self.drawn_lines:
             recent_line = self.drawn_lines[-1]
             result = self.return_fooling_triangles()
