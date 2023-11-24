@@ -5,6 +5,8 @@ import copy
 
 from typing import List, Tuple
 
+import time
+
 class MACHINE():
     """
         [ MACHINE ]
@@ -32,10 +34,14 @@ class MACHINE():
     def find_best_selection(self):
         self.drawn_lines_copy = copy.deepcopy(self.drawn_lines)
 
-        if self.is_opponent_fooled() and self.is_opponent_fooled_flag:
+        fooling_triangles = self.return_fooling_triangles()
+
+        if self.is_opponent_fooled(fooling_triangles) and self.is_opponent_fooled_flag:
             self.is_opponent_fooled_flag = True
         else:
             self.is_opponent_fooled_flag = False
+
+        print("self.is_opponent_fooled_flag", self.is_opponent_fooled_flag)
         
         # 1점
         #   낚시 인지 확인
@@ -51,7 +57,7 @@ class MACHINE():
             print("choice : "+str(line))
             return line
         # 상대방이 낚시에 당하면 낚시 시도
-        elif self.is_opponent_fooled_flag and (line := self.get_candidate_fooling_triangles()) != None:
+        elif self.is_opponent_fooled_flag and (line := self.get_candidate_fooling_triangles(fooling_triangles)) != None:
             print("choice : "+str(line))
             return line
         elif (line := self.countNoScoreActions()) != None:
@@ -149,14 +155,14 @@ class MACHINE():
 
         # Must not cross another line
         condition3 = True
-        for l in self.drawn_lines:
+        for l in self.drawn_lines_copy:
             if len(list(set([line[0], line[1], l[0], l[1]]))) == 3:
                 continue
             elif bool(line_string.intersection(LineString(l))):
                 condition3 = False
 
         # Must be a new line
-        condition4 = (line not in self.drawn_lines)
+        condition4 = (line not in self.drawn_lines_copy)
 
         if condition1 and condition2 and condition3 and condition4:
             return True
@@ -165,16 +171,18 @@ class MACHINE():
 
     
     def check_get2point(self):
-            candidate = []
-            count = 0
-            for (point1, point2) in list(combinations(self.whole_points, 2)):
-                if self.check_availability([point1, point2]): # 이 선이 그릴 수 있는 선인지?
-                    newLine = self.organize_points([point1, point2])
-                    if self.check_triangleCount(newLine) == 2:
-                        candidate.append(newLine)
-                        print("get2point : " + str(newLine))
-            if candidate:
-                return random.choice(candidate)
+        start = time.time()
+        candidate = []
+        count = 0
+        target_points = list(set(self.return_dots_from_lines(self.drawn_lines_copy)))
+        for (point1, point2) in list(combinations(target_points, 2)):
+            if self.check_availability([point1, point2]): # 이 선이 그릴 수 있는 선인지?
+                newLine = self.organize_points([point1, point2])
+                if self.check_triangleCount(newLine) == 2:
+                    candidate.append(newLine)
+                    print("get2point : " + str(newLine))
+        if candidate:
+             return random.choice(candidate)
 
         
             
@@ -186,14 +194,14 @@ class MACHINE():
         candidate = []
         
         # 모든 선분에 대해 점수 낼 수 있는 선분이 있는지 판단
-        for previousLine in self.drawn_lines:
+        for previousLine in self.drawn_lines_copy:
 
             # 한 선분의 양 끝 점에 연결된 다른 선분들 찾기
             point1 = previousLine[0]
             point2 = previousLine[1]
             point1_connected = [] 
             point2_connected = []
-            for l in self.drawn_lines:
+            for l in self.drawn_lines_copy:
                 if l==previousLine: # 자기 자신 제외
                     continue
                 if point1 in l:
@@ -245,21 +253,23 @@ class MACHINE():
         
         # 후보가 있으면, 낚시 인지 확인해야함
         if candidate:
-            candidate_final = copy.deepcopy(candidate)
+            candidate_final = []
             result = self.return_fooling_triangles()
 
             for line in candidate:
                 
                 for triangle_dot, triangle_lines in result["fooling_triangles"]:
-                    line_dots = set(self.return_dots_from_lines(line))
+                    line_dots = set(self.return_dots_from_lines([line]))
                     triangle_dots = set(self.return_dots_from_lines(triangle_lines))
 
                     if line_dots == triangle_dots.intersection(line_dots):
+                        print("fooling line : "+ str(line))
                         break
                 else:
                     candidate_final.append(line)
 
-            return candidate_final[0]
+            if candidate_final:
+                return candidate_final[0]
 
 
 
@@ -270,7 +280,7 @@ class MACHINE():
             if self.check_availability([point1, point2]): # 이 선이 그릴 수 있는 선인지?
                 newLine = self.organize_points([point1, point2])
                 self.drawn_lines_copy.append(newLine) # 그릴 수 있는 선이라면 그렸다고 가정하고 리스트에 추가
-                if self.check_get1point() == None: # 그린 상황에서 점수가 발생하는지 확인
+                if self.check_get1point() == None and self.check_get2point() == None: # 그린 상황에서 점수가 발생하는지 확인
                     candidate.append(newLine)
                     count += 1
                     print(point1, point2)
@@ -289,7 +299,7 @@ class MACHINE():
         point1_connected = [] # 방금 그은 선의 두 점에 이미 그어진 line을 담는 배열
         point2_connected = []
 
-        for l in self.drawn_lines:
+        for l in self.drawn_lines_copy:
             if l==line: # 자기 자신 제외
                 continue
             if point1 in l:
@@ -383,7 +393,7 @@ class MACHINE():
              triangles: List[List[Line, Line, Line], ...]
         """
         triangles = []
-        line_combinations = combinations(self.drawn_lines, 3)
+        line_combinations = combinations(self.drawn_lines_copy, 3)
 
         # for all 3-line combinations (nC3)
         for line_combination in line_combinations:
@@ -442,7 +452,7 @@ class MACHINE():
             inside_lines = []
             for vertex in triangle_dots:
                 temp_line = self.organize_points([vertex, inside_dots[0]])
-                if temp_line in self.drawn_lines:
+                if temp_line in self.drawn_lines_copy:
                     inside_lines.append(temp_line)
 
 
@@ -500,24 +510,24 @@ class MACHINE():
                     fooled_triangle = [fooled_triangle_dots, fooled_triangle_lines]
                     result["fooled_triangles"].append(fooled_triangle)
 
-        print(result)
         return result
     
-    def get_candidate_fooling_triangles(self):
-        candidate_fooling_triangles = self.return_fooling_triangles()["candidate_fooling_triangles"]
-        print(candidate_fooling_triangles)
+    def get_candidate_fooling_triangles(self, fooling_triangles):
+        candidate_fooling_triangles = fooling_triangles["candidate_fooling_triangles"]
 
-        dots = set(candidate_fooling_triangles[0])
-        lines_dots = set(self.return_dots_from_lines(candidate_fooling_triangles[1]))
+        if candidate_fooling_triangles:
 
-        # Tuple
-        middle_dot = list(dots - lines_dots)
-        vertex = random.choice(list(lines_dots))
+            dots = set(candidate_fooling_triangles[0][0])
+            lines_dots = set(self.return_dots_from_lines(candidate_fooling_triangles[0][1]))
 
-        return self.organize_points([middle_dot, vertex])
+            # Tuple
+            middle_dot = list(dots - lines_dots)[0]
+            vertex = random.choice(list(lines_dots))
+
+            return self.organize_points([middle_dot, vertex])
     
     
-    def is_opponent_fooled(self):
+    def is_opponent_fooled(self, fooling_triangles):
         """
         상대방이 낚시에 당했는지 확인하는 함수입니다.
 
@@ -526,20 +536,25 @@ class MACHINE():
         output : is_opponent_fooled
             is_opponent_fooled: True, False
         """
-        if self.drawn_lines:
-            recent_line = self.drawn_lines[-1]
-            result = self.return_fooling_triangles()
+        if self.drawn_lines_copy:
+            recent_line = self.drawn_lines_copy[-1]
+            result = fooling_triangles
 
             fooled_triangles = result["fooled_triangles"]
+            fooling_triangles = result["fooling_triangles"]
 
-            for fooled_triangle in fooled_triangles:
-                if recent_line in fooled_triangle[1]:
-                    return True
+            if not fooled_triangles and not fooling_triangles:
+                return True
+            
             else:
-                return False
+                for fooled_triangle in fooled_triangles:
+                    if recent_line in fooled_triangle[1]:
+                        return True
+                else:
+                    return False
         
         else:
-            return False
+            return True
                     
     def organize_points(self, point_list):
         point_list.sort(key=lambda x: (x[0], x[1]))
