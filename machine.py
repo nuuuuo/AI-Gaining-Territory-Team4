@@ -1,6 +1,7 @@
 import random
-from itertools import combinations
-from shapely.geometry import LineString, Point
+from itertools import combinations, chain, product
+from shapely.geometry import LineString, Point, Polygon
+import copy
 
 from typing import List, Tuple
 
@@ -20,6 +21,8 @@ class MACHINE():
         self.id = "MACHINE"
         self.score = [0, 0] # USER, MACHINE
         self.drawn_lines = [] # Drawn Lines
+        self.drawn_lines_copy = [] # for find_best_selection
+        self.is_opponent_fooled_flag = True
         self.board_size = 7 # 7 x 7 Matrix
         self.num_dots = 0
         self.whole_points = []
@@ -27,8 +30,42 @@ class MACHINE():
         self.triangles = [] # [(a, b), (c, d), (e, f)]
 
     def find_best_selection(self):
-        available = [[point1, point2] for (point1, point2) in list(combinations(self.whole_points, 2)) if self.check_availability([point1, point2])]
-        return random.choice(available)
+        self.drawn_lines_copy = copy.deepcopy(self.drawn_lines)
+
+        if self.is_opponent_fooled() and self.is_opponent_fooled_flag:
+            self.is_opponent_fooled_flag = True
+        else:
+            self.is_opponent_fooled_flag = False
+        
+        # 1점
+        #   낚시 인지 확인
+
+        print("FIND START")
+        
+        # 2점 얻을 수 있는 액션 있는지 확인, 있으면 line 반환
+        if (line := self.check_get2point()) != None:
+            print("choice : "+str(line))
+            return line
+        # 1점 얻을 수 있는 액션 있는지 확인, 있으면 낚시 상황 있는지 확인
+        elif (line := self.check_get1point()) != None:
+            print("choice : "+str(line))
+            return line
+        # 상대방이 낚시에 당하면 낚시 시도
+        elif self.is_opponent_fooled_flag and (line := self.get_candidate_fooling_triangles()) != None:
+            print("choice : "+str(line))
+            return line
+        elif (line := self.countNoScoreActions()) != None:
+            self.drawn_lines_copy.append(line)
+            print("HOW MANY NO SCORE ACTIONS AFTER CHOICE")
+            temp = self.countNoScoreActions()
+            print("END")
+            print("choice : "+str(line))
+            self.drawn_lines_copy.remove(line)
+            return line
+        else:
+            available = [[point1, point2] for (point1, point2) in list(combinations(self.whole_points, 2)) if self.check_availability([point1, point2])]
+            return random.choice(available)
+
 
     #5.외부와 연결되지 않은 두 선분 찾는 함수
     def find_unconnected_lines(self):
@@ -206,8 +243,23 @@ class MACHINE():
                                 print("get1point : "+ str(thirdLine))
                                 candidate.append(thirdLine)
         
+        # 후보가 있으면, 낚시 인지 확인해야함
         if candidate:
-            return candidate[0]
+            candidate_final = copy.deepcopy(candidate)
+            result = self.return_fooling_triangles()
+
+            for line in candidate:
+                
+                for triangle_dot, triangle_lines in result["fooling_triangles"]:
+                    line_dots = set(self.return_dots_from_lines(line))
+                    triangle_dots = set(self.return_dots_from_lines(triangle_lines))
+
+                    if line_dots == triangle_dots.intersection(line_dots):
+                        break
+                else:
+                    candidate_final.append(line)
+
+            return candidate_final[0]
 
 
 
@@ -217,12 +269,12 @@ class MACHINE():
         for (point1, point2) in list(combinations(self.whole_points, 2)):
             if self.check_availability([point1, point2]): # 이 선이 그릴 수 있는 선인지?
                 newLine = self.organize_points([point1, point2])
-                self.drawn_lines.append(newLine) # 그릴 수 있는 선이라면 그렸다고 가정하고 리스트에 추가
+                self.drawn_lines_copy.append(newLine) # 그릴 수 있는 선이라면 그렸다고 가정하고 리스트에 추가
                 if self.check_get1point() == None: # 그린 상황에서 점수가 발생하는지 확인
                     candidate.append(newLine)
                     count += 1
                     print(point1, point2)
-                self.drawn_lines.remove(newLine) # 넣었던 선 다시 삭제
+                self.drawn_lines_copy.remove(newLine) # 넣었던 선 다시 삭제
         print("NoScoreAction : " + str(count))
         if candidate:
             return random.choice(candidate)
@@ -396,7 +448,6 @@ class MACHINE():
 
             return True, inside_dots, inside_lines
 
-
     # Score Checking Functions
     def return_fooling_triangles(self) -> dict:
         """
@@ -449,7 +500,22 @@ class MACHINE():
                     fooled_triangle = [fooled_triangle_dots, fooled_triangle_lines]
                     result["fooled_triangles"].append(fooled_triangle)
 
+        print(result)
         return result
+    
+    def get_candidate_fooling_triangles(self):
+        candidate_fooling_triangles = self.return_fooling_triangles()["candidate_fooling_triangles"]
+        print(candidate_fooling_triangles)
+
+        dots = set(candidate_fooling_triangles[0])
+        lines_dots = set(self.return_dots_from_lines(candidate_fooling_triangles[1]))
+
+        # Tuple
+        middle_dot = list(dots - lines_dots)
+        vertex = random.choice(list(lines_dots))
+
+        return self.organize_points([middle_dot, vertex])
+    
     
     def is_opponent_fooled(self):
         """
@@ -474,10 +540,6 @@ class MACHINE():
         
         else:
             return False
-
-        
-                
-
                     
     def organize_points(self, point_list):
         point_list.sort(key=lambda x: (x[0], x[1]))
