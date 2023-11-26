@@ -559,3 +559,60 @@ class MACHINE():
     def organize_points(self, point_list):
         point_list.sort(key=lambda x: (x[0], x[1]))
         return point_list
+
+
+
+
+
+    
+
+# node_lines = [] // 기용 가능한 연결 후보 points이 담긴 노드 리스트
+# 사용 예시 :  minmax(depth??, -math.inf, math.inf, 미정??)
+# depth의 홀짝이나 고정값이나 max의 layer 수로 최초 maximizing_player의 True/False를 지정해준다
+# 기용 가능한 연결 후보 points가 맨 밑 노드가 되는 minmax tree
+    def minmax(self, depth, alpha, beta, maximizing_player):
+        # if depth == 0 or self.check_endgame():  # 기저 조건 : 깊이가 0이거나 게임 종료 상태일 때
+        if depth == 0:  # 윗줄처럼 하려 했지만 종료 상태 아님이 확실하기 때문에 depth만 확인해줘도 될 것 같다
+            return self.evaluate(maximizing_player)  # 현재 상태 반환
+        
+        """
+        calculate_heuristics() 을 둬도 괜찮. 
+        """
+
+        if maximizing_player:  # max layer인지 체크
+            max_eval = float('-inf')
+            for child in self.possible_moves():  # 가능한 노드들 탐색 함수. 이미 결과값 있다면 해당 points 리스트로 변경 가능
+                eval = child.minmax(depth - 1, alpha, beta, False)  # depth+1로 진행시켜도 됨, 최대 depth 값을 제한한다면.
+                max_eval = max(max_eval, eval)
+                alpha = max(alpha, eval)
+                if beta <= alpha:  # cutoff
+                    break
+            return max_eval
+        else:
+            min_eval = float('inf')
+            for child in self.possible_moves():
+                eval = child.minmax(depth - 1, alpha, beta, True)
+                min_eval = min(min_eval, eval)
+                beta = min(beta, eval)
+                if beta <= alpha:
+                    break
+            return min_eval
+
+
+
+    def evaluate(self, maximizing_player):
+        # 해당 라인을 그어 점수를 얼마나 획득할 수 있는지 평가.
+        count = count_now_avail_tri()  #현재 상태에서 만들 수 있는 삼각형이 몇개인지 계산하는 함수. 기존 가용 삼각형 개수 세는 함수에 count 변수만 추가해도 된다.
+        if maximizing_player:
+            machine_score = machine_score + count  #machine_score는 실제 스코어에 임시 추가 점수를 더한 값이다. machine_score를 구하는 코드 구현해야 함.
+            return machine_score
+        else:
+            user_score = user_score + count  #user_score는 실제 스코어에 임시 추가 점수를 더한 값이다. user_score를 구하는 코드 구현해야 함.
+            return user_score
+        
+        # 단순히 스코어로만 계산할게 아닌, 당장 얻을 수 있는 점수가 큰지 판단해서(그런 점에겐 더 큰 점수 부여) 리턴해도 됨
+
+    def possible_moves(self):
+        # 가능한 가능한 노드들 탐색 함수
+        return []
+    
