@@ -30,13 +30,24 @@ class MACHINE():
 
     #5.외부와 연결되지 않은 두 선분 찾는 함수
     def find_unconnected_lines(self):
+        """
+        input: 
+
+        output: 두 연결되지 않은 선분 line1 line2, 연결되지 않은 선분이 없으면 None
+        """
         for line1 in self.drawn_lines:
             for line2 in self.drawn_lines:
-                if line1 != line2 and not self.is_line_connected(line1, line2): #and not self.has_point_inside(line1, line2):
+                if line1 != line2 and not self.is_line_connected(line1, line2) and not self.has_point_inside(line1, line2):
                     return line1, line2
         return None
 
+    #선분의 끝점이 맞닿아 있는지 확인하는 함수
     def is_line_connected(self, line1, line2):
+        """
+        input: line1, line2
+
+        output: 선분이 끝점을 공유하면 True, 그렇지 않으면 False
+        """
         x1, y1 = line1[0]
         x2, y2 = line1[1]
         x3, y3 = line2[0]
@@ -51,7 +62,13 @@ class MACHINE():
         line2 = LineString([line2[0], line2[1]])
         return line1.intersects(line2)
     
+    #내부에 점이 있는지 확인하는 함수
     def has_point_inside(self, line1, line2):
+        """
+        input: line1, line2
+
+        output: 선분으로 만들어진 다각형 내에 어떤 점이라도 있으면 True, 그렇지 않으면 False
+        """
         # Extract coordinates of the four points
         x1, y1 = line1[0]
         x2, y2 = line1[1]
@@ -62,36 +79,45 @@ class MACHINE():
 
         # Check if any whole_points, excluding the points of line1 and line2, are inside the polygon
         points_to_check = set(self.whole_points) - set([line1[0], line1[1], line2[0], line2[1]])
-        inside_polygon = any(polygon.contains(Point(point)) for point in points_to_check)
+        inside_polygon = any(polygon.contains(Point(point)) or
+                            Point(point).within(LineString([(x2, y2), (x3, y3)])) or
+                            Point(point).within(LineString([(x4, y4), (x1, y1)])) or
+                            Point(point).within(LineString([(x1, y1), (x3, y3)])) or
+                            Point(point).within(LineString([(x2, y2), (x4, y4)])) for point in points_to_check)
 
         # If any whole_points are inside, return True; otherwise, return False
-        return not inside_polygon
+        return inside_polygon
 
 
     #6.외부와 연결되지 않은 두 선분으로 만들 수 있는 선분의 개수 구하는 함수
     def count_possible_lines(self, line1, line2):
+        """
+        input: line1, line2
+
+        output: 주어진 선분들 사이에 그을 수 있는 선분의 수
+        """
         count = 0
         for point1 in line1:
             for point2 in line2:
                 if point1 != point2 and self.check_availability([point1, point2]):
                     count += 1
+        if self.is_diagonal_blocked(line1, line2):
+            count -= 1
         return count
 
+    #대각선이 겹치는지 확인하는 함수
     def is_diagonal_blocked(self, line1, line2):
-        x1, y1 = line1[0]
-        x2, y2 = line1[1]
-        x3, y3 = line2[0]
-        x4, y4 = line2[1]
+        """
+        input: line1, line2
 
-        # Check if the lines are diagonals and if they block each other
-        if (x1 - x2) * (y3 - y4) == (y1 - y2) * (x3 - x4):
-            # Check if the lines cross each other
-            line1 = LineString([line1[0], line1[1]])
-            line2 = LineString([line2[0], line2[1]])
-            return line1.crosses(line2)
-        else:
-            return False
-    
+        output: 두 선분으로 만들어진 대각선이 교차하면 True, 그렇지 않으면 False
+        """
+        diagonal1 = LineString([line1[0], line2[0]])
+        diagonal2 = LineString([line1[1], line2[1]])
+        diagonal3 = LineString([line1[0], line2[1]])
+        diagonal4 = LineString([line1[1], line2[0]])
+        return diagonal1.crosses(diagonal2) or diagonal3.crosses(diagonal4)
+        
     
     def check_availability(self, line):
         line_string = LineString(line)
