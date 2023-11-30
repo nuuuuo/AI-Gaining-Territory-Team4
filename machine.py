@@ -49,21 +49,35 @@ class MACHINE():
 
         print("FIND START")
 
+        lines = self.find_unconnected_lines()
+        if lines:
+            print(lines)
+            return lines[0]
+
         # init_depth, depth, parent_alpha, parent_beta, alpha, beta, cur_map, maximizing_player
         
         # 2점 얻을 수 있는 액션 있는지 확인, 있으면 line 반환
-        if (line := self.check_get2point()) != None:
+        # [line, line, ...]
+        if (lines := self.check_get2point()) != None:
+            line = lines
+            # line = lines[0] TODO
             print("choice : "+str(line))
             # return line
         # 1점 얻을 수 있는 액션 있는지 확인, 있으면 낚시 상황 있는지 확인
-        elif (line := self.check_get1point()) != None:
+        elif (lines := self.check_get1point()) != None:
+            line = lines
+            # line = lines[0] TODO
             print("choice : "+str(line))
             # return line
         # 상대방이 낚시에 당하면 낚시 시도
-        elif self.is_opponent_fooled_flag and (line := self.get_candidate_fooling_triangles(fooling_triangles)) != None:
+        elif self.is_opponent_fooled_flag and (lines := self.get_candidate_fooling_triangles(fooling_triangles)) != None:
+            line = lines
+            # line = lines[0] TODO
             print("choice : "+str(line))
             # return line
-        elif (line := self.countNoScoreActions()) != None:
+        elif (lines := self.countNoScoreActions()) != None:
+            line = lines
+            # line = lines[0] TODO
             self.drawn_lines_copy.append(line)
             print("HOW MANY NO SCORE ACTIONS AFTER CHOICE")
             temp = self.countNoScoreActions()
@@ -71,8 +85,13 @@ class MACHINE():
             print("choice : "+str(line))
             self.drawn_lines_copy.remove(line)
             # return line
+        elif (lines := self.find_unconnected_lines()) != None: # 핑퐁
+            line = lines[0]
+            # line = lines[0] TODO
+            print("choice : "+str(line))
         else:
             line = self.minmax(4, 4, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, self.score[:], True)
+            print("choice : "+str(line))
             # available = [[point1, point2] for (point1, point2) in list(combinations(self.whole_points, 2)) if self.check_availability([point1, point2])]
             # return line
         
@@ -291,18 +310,40 @@ class MACHINE():
 
 ####################################################### 이원준 #######################################################
 
-    #5.외부와 연결되지 않은 두 선분 찾는 함수
+    #5.외부와 연결되지 않은 두 선분 찾는 함수 
+    #핑퐁 선분 찾는 함수
     def find_unconnected_lines(self):
         """
         input: 
 
         output: 두 연결되지 않은 선분 line1 line2, 연결되지 않은 선분이 없으면 None
         """
-        for line1 in self.drawn_lines:
-            for line2 in self.drawn_lines:
-                if line1 != line2 and not self.is_line_connected(line1, line2) and not self.has_point_inside(line1, line2):
-                    return line1, line2
-        return None
+        unconnected_lines = []
+        ping_pong_lines = []
+        lines_combination = list(combinations(self.drawn_lines_copy, 2))
+
+        for line1, line2 in lines_combination:
+                if line1 != line2 and not self.is_line_connected(line1, line2) and not self.has_point_inside(line1, line2) and self.count_possible_lines(line1, line2) == 3:
+                    unconnected_lines.append([line1, line2])
+        
+        for unconnected_line_set in unconnected_lines:
+            line1, line2 = unconnected_line_set
+
+            x1, y1 = line1[0]
+            x2, y2 = line1[1]
+            x3, y3 = line2[0]
+            x4, y4 = line2[1]
+
+            
+            for line in [[(x2, y2), (x3, y3)], [(x4, y4), (x1, y1)], [(x1, y1), (x3, y3)], [(x2, y2), (x4, y4)]]:
+                if self.organize_points(line) != self.organize_points(line1) and self.organize_points(line) != self.organize_points(line2):
+                    ping_pong_lines.append(line)
+
+
+        if ping_pong_lines:
+            return ping_pong_lines
+        else:
+            return None
 
     #선분의 끝점이 맞닿아 있는지 확인하는 함수
     def is_line_connected(self, line1, line2):
@@ -342,6 +383,7 @@ class MACHINE():
 
         # Check if any whole_points, excluding the points of line1 and line2, are inside the polygon
         points_to_check = set(self.whole_points) - set([line1[0], line1[1], line2[0], line2[1]])
+        # TODO 내부 점 포함하는거 버그 수정
         inside_polygon = any(polygon.contains(Point(point)) or
                             Point(point).within(LineString([(x2, y2), (x3, y3)])) or
                             Point(point).within(LineString([(x4, y4), (x1, y1)])) or
@@ -380,6 +422,9 @@ class MACHINE():
         diagonal3 = LineString([line1[0], line2[1]])
         diagonal4 = LineString([line1[1], line2[0]])
         return diagonal1.crosses(diagonal2) or diagonal3.crosses(diagonal4)
+    
+
+
     
 ####################################################### 이원준 #######################################################
 
