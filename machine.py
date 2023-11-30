@@ -47,6 +47,12 @@ class MACHINE():
         #   낚시 인지 확인
 
         print("FIND START")
+
+        # init_depth, depth, parent_alpha, parent_beta, alpha, beta, cur_map, maximizing_player
+
+        line = self.minmax(5, 5, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, True)
+        # available = [[point1, point2] for (point1, point2) in list(combinations(self.whole_points, 2)) if self.check_availability([point1, point2])]
+        return line
         
         # 2점 얻을 수 있는 액션 있는지 확인, 있으면 line 반환
         if (line := self.check_get2point()) != None:
@@ -69,8 +75,9 @@ class MACHINE():
             self.drawn_lines_copy.remove(line)
             return line
         else:
-            available = [[point1, point2] for (point1, point2) in list(combinations(self.whole_points, 2)) if self.check_availability([point1, point2])]
-            return random.choice(available)
+            line = self.minmax(5, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, True)
+            # available = [[point1, point2] for (point1, point2) in list(combinations(self.whole_points, 2)) if self.check_availability([point1, point2])]
+            return line
         
     def organize_points(self, point_list):
         point_list.sort(key=lambda x: (x[0], x[1]))
@@ -636,38 +643,82 @@ class MACHINE():
     # 사용 예시 :  minmax(depth??, -math.inf, math.inf, 미정??)
     # depth의 홀짝이나 고정값이나 max의 layer 수로 최초 maximizing_player의 True/False를 지정해준다
     # 기용 가능한 연결 후보 points가 맨 밑 노드가 되는 minmax tree
-    def minmax(self, depth, alpha, beta, maximizing_player):
+    def minmax(self, init_depth, depth, parent_alpha, parent_beta, alpha, beta, cur_map, maximizing_player):
         # if depth == 0 or self.check_endgame():  # 기저 조건 : 깊이가 0이거나 게임 종료 상태일 때
+        with open("min_max_log.txt", "a") as f:
+            f.write(str(cur_map) + "\n")
+
         if depth == 0:  # 윗줄처럼 하려 했지만 종료 상태 아님이 확실하기 때문에 depth만 확인해줘도 될 것 같다
-            return self.evaluate(maximizing_player)  # 현재 상태 반환
-        
+            return alpha, beta, self.evaluate(maximizing_player), True  # 현재 상태 반환 == 휴리스틱 반환
+                
         """
         calculate_heuristics() 을 둬도 괜찮. 
         """
 
         if maximizing_player:  # max layer인지 체크
-            max_eval = float('-inf')
-            for child in self.possible_moves():  # 가능한 노드들 탐색 함수. 이미 결과값 있다면 해당 points 리스트로 변경 가능
-                eval = child.minmax(depth - 1, alpha, beta, False)  # depth+1로 진행시켜도 됨, 최대 depth 값을 제한한다면.
-                max_eval = max(max_eval, eval)
-                alpha = max(alpha, eval)
-                if beta <= alpha:  # cutoff
+            alpha = float('-inf')
+            max_line = None
+            for line in self.possible_moves(cur_map):  # 가능한 노드들 탐색 함수. 이미 결과값 있다면 해당 points 리스트로 변경 가능
+                next_map = copy.deepcopy(cur_map).append(line)
+                child_alpha, child_beta, eval, child_is_leaf = self.minmax(init_depth, depth - 1, alpha, beta, float("-inf"), float("inf"), next_map, False)  # depth+1로 진행시켜도 됨, 최대 depth 값을 제한한다면.
+
+                if child_is_leaf:
+                    if eval > alpha:
+                        alpha = eval
+                        max_line = line
+                else:
+                    if child_beta > alpha:
+                        alpha = child_beta
+                        max_line = line
+
+                if alpha >= parent_beta:  # cutoff
+                    # parent_beta : 형제 노드의 평가값 중 가장 작은 값
+                    # alpha : 자식 노드의 평가값 중 가장 큰 값
+                    # 내가 max를 뽑으므로, 내 alpha가 parent_beta보다 커지면, 더이상 보는 의미가 없음
                     break
-            return max_eval
-        else:
-            min_eval = float('inf')
-            for child in self.possible_moves():
-                eval = child.minmax(depth - 1, alpha, beta, True)
-                min_eval = min(min_eval, eval)
-                beta = min(beta, eval)
-                if beta <= alpha:
+            
+            if init_depth == depth: # root일 때
+                return max_line
+            else:
+                return alpha, beta, 0, False 
+        
+        else: # min layer
+            beta = float('-inf')
+            min_line = None
+            for line in self.possible_moves(cur_map):  # 가능한 노드들 탐색 함수. 이미 결과값 있다면 해당 points 리스트로 변경 가능
+                next_map = copy.deepcopy(cur_map).append(line)
+                child_alpha, child_beta, eval, child_is_leaf = self.minmax(depth - 1, alpha, beta, float("-inf"), float("inf"), next_map, True)  # depth+1로 진행시켜도 됨, 최대 depth 값을 제한한다면.
+
+                if child_is_leaf:
+                    if eval < beta:
+                        beta = eval
+                        min_line = line
+                else:
+                    if child_alpha < beta:
+                        beta = child_alpha
+                        min_line = line
+
+                if beta <= parent_alpha:  # cutoff
+                    # parent_alpha : 형제 노드의 평가값 중 가장 큰 값
+                    # beta : 자식 노드의 평가값 중 가장 작은 값
+                    # 내가 min을 뽑고 parent가 max를 뽑으므로, 내 beta가 parent_alpha보다 작아면, 더이상 보는 의미가 없음
                     break
-            return min_eval
+                
+            return alpha, beta, 0, False 
 
-
-
-    def evaluate(self, maximizing_player):
+    def evaluate(self):
+        # 상황 평가하는 함수 == 그 상황에 대한 휴리스틱 구하는 함수
         # 해당 라인을 그어 점수를 얼마나 획득할 수 있는지 평가.
+
+        # get 1 score +
+        # get 2 score + 
+        # 마주보는 선분 개수 +
+        # 상대방이 낚시에 당할 때 낚시 삼각형을 만들 수 있으면 +
+        # 
+
+        return 0
+
+
         count = count_now_avail_tri()  #현재 상태에서 만들 수 있는 삼각형이 몇개인지 계산하는 함수. 기존 가용 삼각형 개수 세는 함수에 count 변수만 추가해도 된다.
         if maximizing_player:
             machine_score = machine_score + count  #machine_score는 실제 스코어에 임시 추가 점수를 더한 값이다. machine_score를 구하는 코드 구현해야 함.
@@ -678,13 +729,48 @@ class MACHINE():
         
         # 단순히 스코어로만 계산할게 아닌, 당장 얻을 수 있는 점수가 큰지 판단해서(그런 점에겐 더 큰 점수 부여) 리턴해도 됨
 
-    def possible_moves(self):
+    def possible_moves(self, map):
         # 가능한 가능한 노드들 탐색 함수
-        return []
+        # 현재 그을 수 있는 선분 반환 하는 함수
+        print(map)
+        return self.get_available_lines(map)
     
     
-    def get_available_lines(self):
-        return [[point1, point2] for (point1, point2) in list(combinations(self.whole_points, 2)) if self.check_availability([point1, point2])]
+    def get_available_lines(self, map):
+        return [[point1, point2] for (point1, point2) in list(combinations(self.whole_points, 2)) if self.check_availability_map([point1, point2], map)]
+    
+    def check_availability_map(self, line, map):
+        print("check_avail", map)
+        line_string = LineString(line)
+
+        # Must be one of the whole points
+        condition1 = (line[0] in self.whole_points) and (line[1] in self.whole_points)
+        
+        # Must not skip a dot
+        condition2 = True
+        for point in self.whole_points:
+            if point==line[0] or point==line[1]:
+                continue
+            else:
+                if bool(line_string.intersection(Point(point))):
+                    condition2 = False
+
+        # Must not cross another line
+        condition3 = True
+        for l in map:
+            if len(list(set([line[0], line[1], l[0], l[1]]))) == 3:
+                continue
+            elif bool(line_string.intersection(LineString(l))):
+                condition3 = False
+
+        # Must be a new line
+        condition4 = (line not in map)
+
+        if condition1 and condition2 and condition3 and condition4:
+            return True
+        else:
+            return False   
+
     
 ####################################################### 한승현 #######################################################
                     
