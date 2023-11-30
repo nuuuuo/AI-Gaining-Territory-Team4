@@ -71,99 +71,11 @@ class MACHINE():
         else:
             available = [[point1, point2] for (point1, point2) in list(combinations(self.whole_points, 2)) if self.check_availability([point1, point2])]
             return random.choice(available)
-
-
-    #5.외부와 연결되지 않은 두 선분 찾는 함수
-    def find_unconnected_lines(self):
-        """
-        input: 
-
-        output: 두 연결되지 않은 선분 line1 line2, 연결되지 않은 선분이 없으면 None
-        """
-        for line1 in self.drawn_lines:
-            for line2 in self.drawn_lines:
-                if line1 != line2 and not self.is_line_connected(line1, line2) and not self.has_point_inside(line1, line2):
-                    return line1, line2
-        return None
-
-    #선분의 끝점이 맞닿아 있는지 확인하는 함수
-    def is_line_connected(self, line1, line2):
-        """
-        input: line1, line2
-
-        output: 선분이 끝점을 공유하면 True, 그렇지 않으면 False
-        """
-        x1, y1 = line1[0]
-        x2, y2 = line1[1]
-        x3, y3 = line2[0]
-        x4, y4 = line2[1]
-
-        # Check if the lines share an endpoint
-        if (x1, y1) == (x3, y3) or (x1, y1) == (x4, y4) or (x2, y2) == (x3, y3) or (x2, y2) == (x4, y4):
-            return True
-
-        # Check if the lines overlap
-        line1 = LineString([line1[0], line1[1]])
-        line2 = LineString([line2[0], line2[1]])
-        return line1.intersects(line2)
-    
-    #내부에 점이 있는지 확인하는 함수
-    def has_point_inside(self, line1, line2):
-        """
-        input: line1, line2
-
-        output: 선분으로 만들어진 다각형 내에 어떤 점이라도 있으면 True, 그렇지 않으면 False
-        """
-        # Extract coordinates of the four points
-        x1, y1 = line1[0]
-        x2, y2 = line1[1]
-        x3, y3 = line2[0]
-        x4, y4 = line2[1]
-
-        polygon = Polygon([(x1, y1), (x2, y2), (x3, y3), (x4, y4)])
-
-        # Check if any whole_points, excluding the points of line1 and line2, are inside the polygon
-        points_to_check = set(self.whole_points) - set([line1[0], line1[1], line2[0], line2[1]])
-        inside_polygon = any(polygon.contains(Point(point)) or
-                            Point(point).within(LineString([(x2, y2), (x3, y3)])) or
-                            Point(point).within(LineString([(x4, y4), (x1, y1)])) or
-                            Point(point).within(LineString([(x1, y1), (x3, y3)])) or
-                            Point(point).within(LineString([(x2, y2), (x4, y4)])) for point in points_to_check)
-
-        # If any whole_points are inside, return True; otherwise, return False
-        return inside_polygon
-
-
-    #6.외부와 연결되지 않은 두 선분으로 만들 수 있는 선분의 개수 구하는 함수
-    def count_possible_lines(self, line1, line2):
-        """
-        input: line1, line2
-
-        output: 주어진 선분들 사이에 그을 수 있는 선분의 수
-        """
-        count = 0
-        for point1 in line1:
-            for point2 in line2:
-                if point1 != point2 and self.check_availability([point1, point2]):
-                    count += 1
-        if self.is_diagonal_blocked(line1, line2):
-            count -= 1
-        return count
-
-    #대각선이 겹치는지 확인하는 함수
-    def is_diagonal_blocked(self, line1, line2):
-        """
-        input: line1, line2
-
-        output: 두 선분으로 만들어진 대각선이 교차하면 True, 그렇지 않으면 False
-        """
-        diagonal1 = LineString([line1[0], line2[0]])
-        diagonal2 = LineString([line1[1], line2[1]])
-        diagonal3 = LineString([line1[0], line2[1]])
-        diagonal4 = LineString([line1[1], line2[0]])
-        return diagonal1.crosses(diagonal2) or diagonal3.crosses(diagonal4)
         
-    
+    def organize_points(self, point_list):
+        point_list.sort(key=lambda x: (x[0], x[1]))
+        return point_list
+
     def check_availability(self, line):
         line_string = LineString(line)
 
@@ -193,8 +105,12 @@ class MACHINE():
         if condition1 and condition2 and condition3 and condition4:
             return True
         else:
-            return False    
+            return False   
+        
 
+
+
+####################################################### 신예찬 #######################################################
     
     def check_get2point(self):
         start = time.time()
@@ -352,7 +268,127 @@ class MACHINE():
         
         return get_score_count
 
+####################################################### 신예찬 #######################################################
 
+
+
+
+
+
+
+
+
+
+
+
+####################################################### 이원준 #######################################################
+
+    #5.외부와 연결되지 않은 두 선분 찾는 함수
+    def find_unconnected_lines(self):
+        """
+        input: 
+
+        output: 두 연결되지 않은 선분 line1 line2, 연결되지 않은 선분이 없으면 None
+        """
+        for line1 in self.drawn_lines:
+            for line2 in self.drawn_lines:
+                if line1 != line2 and not self.is_line_connected(line1, line2) and not self.has_point_inside(line1, line2):
+                    return line1, line2
+        return None
+
+    #선분의 끝점이 맞닿아 있는지 확인하는 함수
+    def is_line_connected(self, line1, line2):
+        """
+        input: line1, line2
+
+        output: 선분이 끝점을 공유하면 True, 그렇지 않으면 False
+        """
+        x1, y1 = line1[0]
+        x2, y2 = line1[1]
+        x3, y3 = line2[0]
+        x4, y4 = line2[1]
+
+        # Check if the lines share an endpoint
+        if (x1, y1) == (x3, y3) or (x1, y1) == (x4, y4) or (x2, y2) == (x3, y3) or (x2, y2) == (x4, y4):
+            return True
+
+        # Check if the lines overlap
+        line1 = LineString([line1[0], line1[1]])
+        line2 = LineString([line2[0], line2[1]])
+        return line1.intersects(line2)
+    
+    #내부에 점이 있는지 확인하는 함수
+    def has_point_inside(self, line1, line2):
+        """
+        input: line1, line2
+
+        output: 선분으로 만들어진 다각형 내에 어떤 점이라도 있으면 True, 그렇지 않으면 False
+        """
+        # Extract coordinates of the four points
+        x1, y1 = line1[0]
+        x2, y2 = line1[1]
+        x3, y3 = line2[0]
+        x4, y4 = line2[1]
+
+        polygon = Polygon([(x1, y1), (x2, y2), (x3, y3), (x4, y4)])
+
+        # Check if any whole_points, excluding the points of line1 and line2, are inside the polygon
+        points_to_check = set(self.whole_points) - set([line1[0], line1[1], line2[0], line2[1]])
+        inside_polygon = any(polygon.contains(Point(point)) or
+                            Point(point).within(LineString([(x2, y2), (x3, y3)])) or
+                            Point(point).within(LineString([(x4, y4), (x1, y1)])) or
+                            Point(point).within(LineString([(x1, y1), (x3, y3)])) or
+                            Point(point).within(LineString([(x2, y2), (x4, y4)])) for point in points_to_check)
+
+        # If any whole_points are inside, return True; otherwise, return False
+        return inside_polygon
+
+
+    #6.외부와 연결되지 않은 두 선분으로 만들 수 있는 선분의 개수 구하는 함수
+    def count_possible_lines(self, line1, line2):
+        """
+        input: line1, line2
+
+        output: 주어진 선분들 사이에 그을 수 있는 선분의 수
+        """
+        count = 0
+        for point1 in line1:
+            for point2 in line2:
+                if point1 != point2 and self.check_availability([point1, point2]):
+                    count += 1
+        if self.is_diagonal_blocked(line1, line2):
+            count -= 1
+        return count
+
+    #대각선이 겹치는지 확인하는 함수
+    def is_diagonal_blocked(self, line1, line2):
+        """
+        input: line1, line2
+
+        output: 두 선분으로 만들어진 대각선이 교차하면 True, 그렇지 않으면 False
+        """
+        diagonal1 = LineString([line1[0], line2[0]])
+        diagonal2 = LineString([line1[1], line2[1]])
+        diagonal3 = LineString([line1[0], line2[1]])
+        diagonal4 = LineString([line1[1], line2[0]])
+        return diagonal1.crosses(diagonal2) or diagonal3.crosses(diagonal4)
+    
+####################################################### 이원준 #######################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+####################################################### 김수환 #######################################################
 
     def is_triangle(self, lines: List[Tuple[int, int]]) -> bool:
         """
@@ -581,7 +617,75 @@ class MACHINE():
         
         else:
             return True
+        
+####################################################### 김수환 #######################################################
+
+
+
+
+
+
+
+
+
+
+
+
+####################################################### 한승현 #######################################################
+    # node_lines = [] // 기용 가능한 연결 후보 points이 담긴 노드 리스트
+    # 사용 예시 :  minmax(depth??, -math.inf, math.inf, 미정??)
+    # depth의 홀짝이나 고정값이나 max의 layer 수로 최초 maximizing_player의 True/False를 지정해준다
+    # 기용 가능한 연결 후보 points가 맨 밑 노드가 되는 minmax tree
+    def minmax(self, depth, alpha, beta, maximizing_player):
+        # if depth == 0 or self.check_endgame():  # 기저 조건 : 깊이가 0이거나 게임 종료 상태일 때
+        if depth == 0:  # 윗줄처럼 하려 했지만 종료 상태 아님이 확실하기 때문에 depth만 확인해줘도 될 것 같다
+            return self.evaluate(maximizing_player)  # 현재 상태 반환
+        
+        """
+        calculate_heuristics() 을 둬도 괜찮. 
+        """
+
+        if maximizing_player:  # max layer인지 체크
+            max_eval = float('-inf')
+            for child in self.possible_moves():  # 가능한 노드들 탐색 함수. 이미 결과값 있다면 해당 points 리스트로 변경 가능
+                eval = child.minmax(depth - 1, alpha, beta, False)  # depth+1로 진행시켜도 됨, 최대 depth 값을 제한한다면.
+                max_eval = max(max_eval, eval)
+                alpha = max(alpha, eval)
+                if beta <= alpha:  # cutoff
+                    break
+            return max_eval
+        else:
+            min_eval = float('inf')
+            for child in self.possible_moves():
+                eval = child.minmax(depth - 1, alpha, beta, True)
+                min_eval = min(min_eval, eval)
+                beta = min(beta, eval)
+                if beta <= alpha:
+                    break
+            return min_eval
+
+
+
+    def evaluate(self, maximizing_player):
+        # 해당 라인을 그어 점수를 얼마나 획득할 수 있는지 평가.
+        count = count_now_avail_tri()  #현재 상태에서 만들 수 있는 삼각형이 몇개인지 계산하는 함수. 기존 가용 삼각형 개수 세는 함수에 count 변수만 추가해도 된다.
+        if maximizing_player:
+            machine_score = machine_score + count  #machine_score는 실제 스코어에 임시 추가 점수를 더한 값이다. machine_score를 구하는 코드 구현해야 함.
+            return machine_score
+        else:
+            user_score = user_score + count  #user_score는 실제 스코어에 임시 추가 점수를 더한 값이다. user_score를 구하는 코드 구현해야 함.
+            return user_score
+        
+        # 단순히 스코어로만 계산할게 아닌, 당장 얻을 수 있는 점수가 큰지 판단해서(그런 점에겐 더 큰 점수 부여) 리턴해도 됨
+
+    def possible_moves(self):
+        # 가능한 가능한 노드들 탐색 함수
+        return []
+    
+    
+    def get_available_lines(self):
+        return [[point1, point2] for (point1, point2) in list(combinations(self.whole_points, 2)) if self.check_availability([point1, point2])]
+    
+####################################################### 한승현 #######################################################
                     
-    def organize_points(self, point_list):
-        point_list.sort(key=lambda x: (x[0], x[1]))
-        return point_list
+    
