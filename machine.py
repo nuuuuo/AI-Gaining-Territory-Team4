@@ -32,6 +32,7 @@ class MACHINE():
         self.triangles = [] # [(a, b), (c, d), (e, f)]
 
     def find_best_selection(self):
+        start = time.time()
         self.drawn_lines_copy = copy.deepcopy(self.drawn_lines)
 
         fooling_triangles = self.return_fooling_triangles()
@@ -49,23 +50,19 @@ class MACHINE():
         print("FIND START")
 
         # init_depth, depth, parent_alpha, parent_beta, alpha, beta, cur_map, maximizing_player
-
-        line = self.minmax(5, 5, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, True)
-        # available = [[point1, point2] for (point1, point2) in list(combinations(self.whole_points, 2)) if self.check_availability([point1, point2])]
-        return line
         
         # 2점 얻을 수 있는 액션 있는지 확인, 있으면 line 반환
         if (line := self.check_get2point()) != None:
             print("choice : "+str(line))
-            return line
+            # return line
         # 1점 얻을 수 있는 액션 있는지 확인, 있으면 낚시 상황 있는지 확인
         elif (line := self.check_get1point()) != None:
             print("choice : "+str(line))
-            return line
+            # return line
         # 상대방이 낚시에 당하면 낚시 시도
         elif self.is_opponent_fooled_flag and (line := self.get_candidate_fooling_triangles(fooling_triangles)) != None:
             print("choice : "+str(line))
-            return line
+            # return line
         elif (line := self.countNoScoreActions()) != None:
             self.drawn_lines_copy.append(line)
             print("HOW MANY NO SCORE ACTIONS AFTER CHOICE")
@@ -73,11 +70,15 @@ class MACHINE():
             print("END")
             print("choice : "+str(line))
             self.drawn_lines_copy.remove(line)
-            return line
+            # return line
         else:
-            line = self.minmax(5, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, True)
+            line = self.minmax(4, 4, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, self.score[:], True)
             # available = [[point1, point2] for (point1, point2) in list(combinations(self.whole_points, 2)) if self.check_availability([point1, point2])]
-            return line
+            # return line
+        
+        print(time.time() - start)
+
+        return line
         
     def organize_points(self, point_list):
         point_list.sort(key=lambda x: (x[0], x[1]))
@@ -643,13 +644,18 @@ class MACHINE():
     # 사용 예시 :  minmax(depth??, -math.inf, math.inf, 미정??)
     # depth의 홀짝이나 고정값이나 max의 layer 수로 최초 maximizing_player의 True/False를 지정해준다
     # 기용 가능한 연결 후보 points가 맨 밑 노드가 되는 minmax tree
-    def minmax(self, init_depth, depth, parent_alpha, parent_beta, alpha, beta, cur_map, maximizing_player):
+    # score = [machine(우리팀), user(상대팀)]
+    def minmax(self, init_depth, depth, parent_alpha, parent_beta, alpha, beta, cur_map, score, maximizing_player):
         # if depth == 0 or self.check_endgame():  # 기저 조건 : 깊이가 0이거나 게임 종료 상태일 때
         with open("min_max_log.txt", "a") as f:
             f.write(str(cur_map) + "\n")
 
         if depth == 0:  # 윗줄처럼 하려 했지만 종료 상태 아님이 확실하기 때문에 depth만 확인해줘도 될 것 같다
-            return alpha, beta, self.evaluate(maximizing_player), True  # 현재 상태 반환 == 휴리스틱 반환
+            eval = self.evaluate(cur_map, maximizing_player)
+            eval = score[0] - score[1]
+            print("leaf node")
+            print("eval:, ", eval)
+            return alpha, beta, eval, True  # 현재 상태 반환 == 휴리스틱 반환
                 
         """
         calculate_heuristics() 을 둬도 괜찮. 
@@ -659,8 +665,12 @@ class MACHINE():
             alpha = float('-inf')
             max_line = None
             for line in self.possible_moves(cur_map):  # 가능한 노드들 탐색 함수. 이미 결과값 있다면 해당 points 리스트로 변경 가능
-                next_map = copy.deepcopy(cur_map).append(line)
-                child_alpha, child_beta, eval, child_is_leaf = self.minmax(init_depth, depth - 1, alpha, beta, float("-inf"), float("inf"), next_map, False)  # depth+1로 진행시켜도 됨, 최대 depth 값을 제한한다면.
+                cur_map_copy = copy.deepcopy(cur_map)
+                cur_map_copy.append(line)
+                next_map = cur_map_copy
+                changed_score = [score[0] + self.check_triangleCount_map(line, next_map), score[1]]
+
+                child_alpha, child_beta, eval, child_is_leaf = self.minmax(init_depth, depth - 1, alpha, beta, float("-inf"), float("inf"), next_map, changed_score, False)  # depth+1로 진행시켜도 됨, 최대 depth 값을 제한한다면.
 
                 if child_is_leaf:
                     if eval > alpha:
@@ -672,6 +682,9 @@ class MACHINE():
                         max_line = line
 
                 if alpha >= parent_beta:  # cutoff
+                    print("cutoff in max")
+                    print("alpha:", alpha)
+                    print("parent_beta:", parent_beta)
                     # parent_beta : 형제 노드의 평가값 중 가장 작은 값
                     # alpha : 자식 노드의 평가값 중 가장 큰 값
                     # 내가 max를 뽑으므로, 내 alpha가 parent_beta보다 커지면, 더이상 보는 의미가 없음
@@ -683,11 +696,14 @@ class MACHINE():
                 return alpha, beta, 0, False 
         
         else: # min layer
-            beta = float('-inf')
+            beta = float('inf')
             min_line = None
             for line in self.possible_moves(cur_map):  # 가능한 노드들 탐색 함수. 이미 결과값 있다면 해당 points 리스트로 변경 가능
-                next_map = copy.deepcopy(cur_map).append(line)
-                child_alpha, child_beta, eval, child_is_leaf = self.minmax(depth - 1, alpha, beta, float("-inf"), float("inf"), next_map, True)  # depth+1로 진행시켜도 됨, 최대 depth 값을 제한한다면.
+                cur_map_copy = copy.deepcopy(cur_map)
+                cur_map_copy.append(line)
+                next_map = cur_map_copy
+                changed_score = [score[0], score[1] + self.check_triangleCount_map(line, next_map)]
+                child_alpha, child_beta, eval, child_is_leaf = self.minmax(init_depth, depth - 1, alpha, beta, float("-inf"), float("inf"), next_map, changed_score, True)  # depth+1로 진행시켜도 됨, 최대 depth 값을 제한한다면.
 
                 if child_is_leaf:
                     if eval < beta:
@@ -699,6 +715,9 @@ class MACHINE():
                         min_line = line
 
                 if beta <= parent_alpha:  # cutoff
+                    print("cutoff in min")
+                    print("beta:", beta)
+                    print("parent_alpha:", parent_alpha)
                     # parent_alpha : 형제 노드의 평가값 중 가장 큰 값
                     # beta : 자식 노드의 평가값 중 가장 작은 값
                     # 내가 min을 뽑고 parent가 max를 뽑으므로, 내 beta가 parent_alpha보다 작아면, 더이상 보는 의미가 없음
@@ -706,7 +725,7 @@ class MACHINE():
                 
             return alpha, beta, 0, False 
 
-    def evaluate(self):
+    def evaluate(self, map, is_maximizing):
         # 상황 평가하는 함수 == 그 상황에 대한 휴리스틱 구하는 함수
         # 해당 라인을 그어 점수를 얼마나 획득할 수 있는지 평가.
 
@@ -716,7 +735,17 @@ class MACHINE():
         # 상대방이 낚시에 당할 때 낚시 삼각형을 만들 수 있으면 +
         # 
 
-        return 0
+        possible_lines = self.possible_moves(map)
+        max_triangles = 0
+        sum_triangles = 0
+
+        for line in possible_lines:
+            available_triangles = self.check_triangleCount_map(line, map)
+            max_triangles = max(available_triangles, max_triangles)
+            sum_triangles += available_triangles
+
+        # return max_triangles
+        return sum_triangles
 
 
         count = count_now_avail_tri()  #현재 상태에서 만들 수 있는 삼각형이 몇개인지 계산하는 함수. 기존 가용 삼각형 개수 세는 함수에 count 변수만 추가해도 된다.
@@ -732,7 +761,8 @@ class MACHINE():
     def possible_moves(self, map):
         # 가능한 가능한 노드들 탐색 함수
         # 현재 그을 수 있는 선분 반환 하는 함수
-        print(map)
+        lines = []
+
         return self.get_available_lines(map)
     
     
@@ -740,7 +770,6 @@ class MACHINE():
         return [[point1, point2] for (point1, point2) in list(combinations(self.whole_points, 2)) if self.check_availability_map([point1, point2], map)]
     
     def check_availability_map(self, line, map):
-        print("check_avail", map)
         line_string = LineString(line)
 
         # Must be one of the whole points
@@ -770,6 +799,42 @@ class MACHINE():
             return True
         else:
             return False   
+        
+    def check_triangleCount_map(self, line, map):
+        get_score_count = 0
+
+        point1 = line[0]
+        point2 = line[1]
+
+        point1_connected = [] # 방금 그은 선의 두 점에 이미 그어진 line을 담는 배열
+        point2_connected = []
+
+        for l in map:
+            if l==line: # 자기 자신 제외
+                continue
+            if point1 in l:
+                point1_connected.append(l)
+            if point2 in l:
+                point2_connected.append(l)
+
+        if point1_connected and point2_connected: # 최소한 2점 모두 다른 선분과 연결되어 있어야 함
+            for line1, line2 in product(point1_connected, point2_connected):
+                
+                # Check if it is a triangle & Skip the triangle has occupied
+                triangle = self.organize_points(list(set(chain(*[line, line1, line2]))))
+                if len(triangle) != 3 or triangle in self.triangles: # 삼각형이 아니거나 이미 있는 삼각형인 경우는 패스
+                    continue
+                
+                get_score = True
+                for point in self.whole_points: # 만들어진 삼각형 내부에 점이 있는지 판단
+                    if point in triangle:
+                        continue
+                    if bool(Polygon(triangle).intersection(Point(point))):
+                        get_score = False
+                if get_score:
+                    get_score_count += 1
+        
+        return get_score_count
 
     
 ####################################################### 한승현 #######################################################
