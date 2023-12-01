@@ -365,6 +365,11 @@ class MACHINE():
         line1 = LineString([line1[0], line1[1]])
         line2 = LineString([line2[0], line2[1]])
         return line1.intersects(line2)
+
+    def polar_angle(self, point, center):
+        x, y = point
+        cx, cy = center
+        return math.atan2(y - cy, x - cx)
     
     #내부에 점이 있는지 확인하는 함수
     def has_point_inside(self, line1, line2):
@@ -379,16 +384,30 @@ class MACHINE():
         x3, y3 = line2[0]
         x4, y4 = line2[1]
 
+        # 중심점 계산
+        center_x = (x1 + x2 + x3 + x4) / 4
+        center_y = (y1 + y2 + y3 + y4) / 4
+
+        # 각 점에 대한 극좌표를 계산하고 각도를 기준으로 정렬
+        sorted_points = sorted([(x1, y1), (x2, y2), (x3, y3), (x4, y4)], key=lambda p: self.polar_angle(p, (center_x, center_y)))
+
+        # 정렬된 점들을 다시 x1, y1, x2, y2, x3, y3, x4, y4에 할당
+        x1, y1 = sorted_points[0]
+        x2, y2 = sorted_points[1]
+        x3, y3 = sorted_points[2]
+        x4, y4 = sorted_points[3]
+        
         polygon = Polygon([(x1, y1), (x2, y2), (x3, y3), (x4, y4)])
 
         # Check if any whole_points, excluding the points of line1 and line2, are inside the polygon
         points_to_check = set(self.whole_points) - set([line1[0], line1[1], line2[0], line2[1]])
-        # TODO 내부 점 포함하는거 버그 수정
         inside_polygon = any(polygon.contains(Point(point)) or
-                            Point(point).within(LineString([(x2, y2), (x3, y3)])) or
-                            Point(point).within(LineString([(x4, y4), (x1, y1)])) or
-                            Point(point).within(LineString([(x1, y1), (x3, y3)])) or
-                            Point(point).within(LineString([(x2, y2), (x4, y4)])) for point in points_to_check)
+                             Point(point).within(LineString([(x1, y1), (x2, y2)])) or
+                             Point(point).within(LineString([(x1, y1), (x3, y3)])) or
+                             Point(point).within(LineString([(x1, y1), (x4, y4)])) or
+                             Point(point).within(LineString([(x2, y2), (x3, y3)])) or
+                             Point(point).within(LineString([(x2, y2), (x4, y4)])) or
+                             Point(point).within(LineString([(x3, y3), (x4, y4)])) for point in points_to_check)
 
         # If any whole_points are inside, return True; otherwise, return False
         return inside_polygon
