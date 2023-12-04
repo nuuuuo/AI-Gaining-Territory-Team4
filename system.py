@@ -7,6 +7,7 @@ import pandas as pd
 from shapely.geometry import LineString, Point, Polygon
 
 from machine import MACHINE
+from machine2 import MACHINE2
 from options import PLAYERS, BACKGROUND, RADIUS, LINE_WIDTH, LINE_COLOR, CIRCLE_WIDTH, CIRCLE_COLOR, \
                     USER_COLOR, MACHINE_COLOR, PROGRAM_SIZE, CANVAS_SIZE, GRID_COLOR
 
@@ -45,6 +46,7 @@ class SYSTEM():
         self.interval = None
         self.offset = None
         self.machine = MACHINE()
+        self.machine2 = MACHINE2()
 
         self.get_score = False
 
@@ -225,6 +227,8 @@ class SYSTEM():
         for idx_x, idx_y in self.whole_points:
             self.circle(self.location[idx_x], self.location[idx_y], CIRCLE_COLOR)
 
+        print("가능한 액션 개수:", self.print_lineCount())
+
     def circle(self, cx, cy, color):
         self.board.create_oval(cx-RADIUS, cy-RADIUS, cx+RADIUS, cy+RADIUS, fill=color, width=CIRCLE_WIDTH)
     
@@ -245,14 +249,14 @@ class SYSTEM():
 
         line = self.organize_points([(start_x, start_y), (end_x, end_y)])
 
-        # self.machine.score = self.score
-        # self.machine.drawn_lines = self.drawn_lines
-        # self.machine.whole_points = self.whole_points
-        # self.machine.location = self.location
-        # self.machine.triangles = self.triangles
+        self.machine2.score = self.score
+        self.machine2.drawn_lines = self.drawn_lines
+        self.machine2.whole_points = self.whole_points
+        self.machine2.location = self.location
+        self.machine2.triangles = self.triangles
 
-        # line = self.machine.find_best_selection()
-        # line = self.organize_points(line)
+        line = self.machine2.find_best_selection()
+        line = self.organize_points(line)
 
         if self.check_availability("USER", line):
             self.label_warning.config(text="")
@@ -440,3 +444,29 @@ class SYSTEM():
             self.turn = "USER"
             self.label_currentturn.config(text=self.turn, fg=USER_COLOR)
     
+    def print_lineCount(self):
+        linecount = 0
+        self.drawn_lines = []
+        while(True):
+            for (point1, point2) in list(combinations(self.whole_points, 2)):
+                line = self.organize_points([point1, point2])
+                if self.check_availability("USER",line):
+                    self.drawn_lines.append(line)
+                    linecount += 1
+                    # draw = [(self.location[point[0]], self.location[point[1]]) for point in line]
+                    # self.line(draw[0], draw[1], color=LINE_COLOR)
+            
+            possibility = False
+            for (point1, point2) in list(combinations(self.whole_points, 2)):
+                line = self.organize_points([point1, point2])
+                if self.check_availability("USER",line):
+                    possibility = True
+            if possibility == False:
+                break
+        for line in self.drawn_lines:
+            print(line)
+        print("linecount : "+str(linecount))
+
+        self.drawn_lines = []
+        
+        return linecount
