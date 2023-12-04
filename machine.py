@@ -33,6 +33,7 @@ class MACHINE():
         self.triangles = [] # [(a, b), (c, d), (e, f)]
         self.minmax_mode = False
         self.search_depth = 2
+        self.candidate_num = 15
 
     def find_best_selection(self):
         start = time.time()
@@ -54,7 +55,7 @@ class MACHINE():
         
         if (lines := self.check_get2point()) != None: # lines = None or [line, line ...]
             # if self.minmax_mode:
-            #     line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, self.score[:], True, lines)
+            #     line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, [0,0], True, lines)
             # else:
             #     line = lines[0]
             line = lines[0]
@@ -63,23 +64,35 @@ class MACHINE():
         # 1점 얻을 수 있는 액션 있는지 확인, 있으면 낚시 상황 있는지 확인
         elif (lines := self.check_get1point()) != None:
             # if self.minmax_mode:
-            #     line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, self.score[:], True, lines)
+            #     line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, [0,0], True, lines)
             # else:
             #     line = lines[0]
-            line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, self.score[:], True, lines)
-            print("(get 1 point)choice : "+str(line))
+            is_good, line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, [0,0], True, lines)
+            if not is_good:
+                print("Not good 1 point actions")
+                lines = list(self.get_available_lines(self.drawn_lines_copy))
+                random.shuffle(lines)
+                _, line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, [0,0], True, lines[:self.candidate_num])
+            
+            else:
+                print("(get 1 point)choice : "+str(line))
             # return line
         # 상대방이 낚시에 당하면 낚시 시도
         elif self.is_opponent_fooled_flag and (lines := self.get_candidate_fooling_triangles(fooling_triangles)) != None:
             if self.minmax_mode:
-                line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, self.score[:], True, lines)
+                is_good, line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, [0,0], True, lines)
+                if not is_good:
+                    print("Not good fooling actions")
+                    lines = list(self.get_available_lines(self.drawn_lines_copy))
+                    random.shuffle(lines)
+                    _, line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, [0,0], True, lines[:self.candidate_num])
             else:
                 line = lines[0]
             print("(fooling triangle)choice : "+str(line))
             # return line
         elif (lines := self.countNoScoreActions()) != None:
             if self.minmax_mode:
-                line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, self.score[:], True, lines)
+                is_good, line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, [0,0], True, lines)
             else:
                 result = 10000
                 for l in lines:
@@ -112,14 +125,20 @@ class MACHINE():
             
         elif (lines := self.find_unconnected_lines()) != None: # 핑퐁
             if self.minmax_mode:
-                line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, self.score[:], True, lines)
+                is_good, line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, [0,0], True, lines)
+                if not is_good:
+                    print("Not good pingpong actions")
+                    lines = list(self.get_available_lines(self.drawn_lines_copy))
+                    random.shuffle(lines)
+                    _, line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, [0,0], True, lines[:self.candidate_num])
             else:
                 line = lines[0]
             print("(ping pong)choice : "+str(line))
 
         else:
-            lines = self.get_available_lines(self.drawn_lines_copy)[:15]
-            line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, self.score[:], True, lines)
+            lines = list(self.get_available_lines(self.drawn_lines_copy))
+            random.shuffle(lines)
+            _, line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, [0,0], True, lines[:self.candidate_num])
             self.minmax_mode = True
             print("(line)choice : "+str(line))
             print("minmax mode")
@@ -817,7 +836,10 @@ class MACHINE():
                     break
             
             if init_depth == depth: # root일 때
-                return max_line
+                if alpha < 0:
+                    return False, max_line
+                else:
+                    return True, max_line
             else:
                 return alpha, beta, 0, False 
         
@@ -828,7 +850,7 @@ class MACHINE():
                 cur_map_copy = copy.deepcopy(cur_map)
                 cur_map_copy.append(line)
                 next_map = cur_map_copy
-                changed_score = [score[0] + self.check_triangleCount_map(line, next_map)  * (0.95 ** (init_depth - depth)), score[1]]
+                changed_score = [score[0] + self.check_triangleCount_map(line, next_map)  * (1.02 ** (init_depth - depth)), score[1]]
                 child_alpha, child_beta, eval, child_is_leaf = self.minmax(init_depth, depth - 1, alpha, beta, float("-inf"), float("inf"), next_map, changed_score, True, [])  # depth+1로 진행시켜도 됨, 최대 depth 값을 제한한다면.
 
                 if child_is_leaf:

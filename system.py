@@ -249,14 +249,14 @@ class SYSTEM():
 
         line = self.organize_points([(start_x, start_y), (end_x, end_y)])
 
-        self.machine2.score = self.score
-        self.machine2.drawn_lines = self.drawn_lines
-        self.machine2.whole_points = self.whole_points
-        self.machine2.location = self.location
-        self.machine2.triangles = self.triangles
+        # self.machine2.score = self.score
+        # self.machine2.drawn_lines = self.drawn_lines
+        # self.machine2.whole_points = self.whole_points
+        # self.machine2.location = self.location
+        # self.machine2.triangles = self.triangles
 
-        line = self.machine2.find_best_selection()
-        line = self.organize_points(line)
+        # line = self.machine2.find_best_selection()
+        # line = self.organize_points(line)
 
         if self.check_availability("USER", line):
             self.label_warning.config(text="")
