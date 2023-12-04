@@ -32,7 +32,11 @@ class MACHINE():
         self.location = []
         self.triangles = [] # [(a, b), (c, d), (e, f)]
         self.minmax_mode = False
-        self.search_depth = 2
+
+        self.search_depth = 3
+        
+        self.state = ""
+
         self.candidate_num = 15
 
     def find_best_selection(self):
@@ -94,19 +98,25 @@ class MACHINE():
             if self.minmax_mode:
                 is_good, line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, [0,0], True, lines)
             else:
-                result = 10000
-                for l in lines:
-                    self.drawn_lines_copy.append(l) # 이 선택을 했을 때에 상대방 입장에서 nocountAction을 계산하기 위해
-                    count = self.countNoScoreActions_returnCount()
-                    if count == 0:
-                        line = l
-                        self.drawn_lines_copy.remove(l)
-                        break
-                    elif count > 2:
-                        if result > count:
-                            result = count
+                if(len(lines)) == 1:
+                    return lines[0]
+                elif(len(lines) < 10):
+                    result = 10000
+                    for l in lines:
+                        self.drawn_lines_copy.append(l) # 이 선택을 했을 때에 상대방 입장에서 nocountAction을 계산하기 위해
+                        count = self.countNoScoreActions_returnCount()
+                        if count == 0:
                             line = l
-                    self.drawn_lines_copy.remove(l)
+                            self.drawn_lines_copy.remove(l)
+                            break
+                        elif count > 2:
+                            if result > count:
+                                result = count
+                                line = l
+                        self.drawn_lines_copy.remove(l) 
+                else:
+                    return random.choice(lines)
+                
                 # 모든 경우에 대해서 전부 2 이하로 남는다면? minmax실시하는게 맞지 않을까
                 if line == None:
                     return random.choice(lines)
@@ -309,7 +319,52 @@ class MACHINE():
         print("NoScoreAction : " + str(count))
 
         if candidate:
-            return candidate
+            candidate_only = []
+            for l in candidate:
+                result = self.return_fooling_triangles()
+                self.drawn_lines_copy.append(l)
+                afterResult = self.return_fooling_triangles()
+                if len(result["candidate_fooling_triangles"]) < len(afterResult["candidate_fooling_triangles"]):
+                    if self.state == "GOOD":
+                        candidate_only = []
+                        candidate_only.append(l)
+                        break
+                    else:
+                        self.drawn_lines_copy.remove(l)
+                        for l2 in candidate:
+                            if l == l2:
+                                continue
+                            self.drawn_lines_copy.append(l2)
+                            if not self.check_availability(l):
+                                candidate_only = []
+                                candidate_only.append(l2)
+                                self.drawn_lines_copy.remove(l2)
+                                break
+                        if candidate_only:
+                            break
+                else:
+                    self.drawn_lines_copy.remove(l)
+            if candidate_only:
+                return candidate_only   
+            else:
+                # for l in candidate:
+                #     if self.state == "GOOD":
+                #         point1 = l[0]
+                #         point2 = l[1]
+                #         point1_connected = [] 
+                #         point2_connected = []
+                #         for line in self.drawn_lines_copy:
+                #             if line == l:
+                #                 continue
+                #             if point1 in line:
+                #                 point1_connected.append(line)
+                #             if point2 in line:
+                #                 point2_connected.append(line)
+                #         if point1_connected or point2_connected:
+                #             candidate_only = []
+                #             candidate_only.append(l)
+                #             break 
+                return candidate
         else:
             return None
         
