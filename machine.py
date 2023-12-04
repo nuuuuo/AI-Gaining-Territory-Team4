@@ -79,7 +79,22 @@ class MACHINE():
             if self.minmax_mode:
                 line = self.minmax(self.search_depth, self.search_depth, float("-inf"), float("inf"), float('-inf'), float('inf'), self.drawn_lines_copy, self.score[:], True, lines)
             else:
-                line = lines[0]
+                result = 10000
+                for l in lines:
+                    self.drawn_lines_copy.append(l) # 이 선택을 했을 때에 상대방 입장에서 nocountAction을 계산하기 위해
+                    count = self.countNoScoreActions_returnCount()
+                    if count == 0:
+                        line = l
+                        self.drawn_lines_copy.remove(l)
+                        break
+                    elif count > 2:
+                        if result > count:
+                            result = count
+                            line = l
+                    self.drawn_lines_copy.remove(l)
+                # 모든 경우에 대해서 전부 2 이하로 남는다면? minmax실시하는게 맞지 않을까
+                # if line == None:
+                
 
             if line != None:
                 self.drawn_lines_copy.append(line)
@@ -275,6 +290,18 @@ class MACHINE():
             return candidate
         else:
             return None
+        
+    def countNoScoreActions_returnCount(self):
+        count = 0
+        for (point1, point2) in list(combinations(self.whole_points, 2)):
+            if self.check_availability([point1, point2]): # 이 선이 그릴 수 있는 선인지?
+                newLine = self.organize_points([point1, point2])
+                self.drawn_lines_copy.append(newLine) # 그릴 수 있는 선이라면 그렸다고 가정하고 리스트에 추가
+                if self.check_get1point() == None and self.check_get2point() == None: # 그린 상황에서 점수가 발생하는지 확인
+                    count += 1
+                    print(point1, point2)
+                self.drawn_lines_copy.remove(newLine) # 넣었던 선 다시 삭제
+        return count
 
 
     def check_triangleCount(self, line):
